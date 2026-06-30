@@ -15,30 +15,10 @@
 #include <sys/types.h>
 #include <time.h>
 
-/* ---- log helper: shared timestamp + color macros ---- */
+/* ---- log helper: shared timestamp ---- */
 extern const char *ts(void);
 #define TS_FMT "%s [%s] "
 #define TS_ARG ts(), __FUNCTION__
-#define CLR_ENABLED (getenv("PRL_NOCOLOR") ? 0 : 1)
-#define CLR(c)   (CLR_ENABLED ? (c) : "")
-#define CLRR     (CLR_ENABLED ? "\033[0m" : "")
-#define LOG(fmt, ...)  printf(TS_FMT fmt, TS_ARG, ##__VA_ARGS__)
-
-/* ---- language support ---- */
-#define LANG() (getenv("LANG") && !strcmp(getenv("LANG"), "cn") ? 1 : 0)
-#define _S(cn, en) (LANG() ? (cn) : (en))
-#define _DEVICE   _S("设备", "DEVICE")
-#define _NAME     _S("标识", "Name")
-#define _ACCEPT   _S("接收", "Accept")
-#define _STALE    _S("过期", "Stale")
-#define _INVALID  _S("无效", "Invalid")
-#define _SPEED    _S("速度", "Speed")
-#define _SPEED_UNIT _S("TA/s", "TA/s")
-#define _NEW_JOB  _S("新任务", "New job")
-#define _PASS     _S("通过", "Pass")
-#define _REJECT   _S("拒绝", "Rej")
-#define _HIT      _S("命中", "Hit")
-#define _CONN     _S("连接", "Connect")
 
 #define LINE   8192
 #define JOBLEN 64

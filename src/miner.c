@@ -95,6 +95,7 @@ static int g_lang_cn = 0;       /* set at startup from LANG env */
 #define _D_STALE    _S2("过期", "Stale")
 #define _D_INVALID  _S2("无效", "Invalid")
 #define _D_SPEED    _S2("速度", "Speed")
+#define _D_SPEED_UNIT _S2("TA/s", "TA/s")
 
 static void print_dashboard(int dev, const char *worker, double iter_s,
                             long acc, long sub, long stale, long inv,
@@ -104,12 +105,12 @@ static void print_dashboard(int dev, const char *worker, double iter_s,
     g_last_dash = now;
     /* clear 4 lines and redraw */
     printf("\033[4A\033[J");
-    printf(CLR("\033[36m")"============================================================" CLRR "\n");
-    printf(CLR("\033[36m")"  %s: NPU-%d  |  %s: %-16s  |  %s: %-4ld  %s: %-4ld  %s: %-4ld" CLRR "\n",
+    printf("============================================================\n");
+    printf("  %s: NPU-%d  |  %s: %-16s  |  %s: %-4ld  %s: %-4ld  %s: %-4ld\n",
            _D_DEVICE, dev, _D_NAME, worker, _D_ACCEPT, acc, _D_STALE, stale, _D_INVALID, inv);
-    printf(CLR("\033[36m")"  %s: %9.2f %s  |  iter/s: %7.3f  |  scan: %5.1fs  %s" CLRR "\n",
-           _D_SPEED, iter_s, _D_SPEED_UNIT, iter_s, scan_s, hit ? CLR("\033[32m")"[HIT]" CLR("\033[36m") : "");
-    printf(CLR("\033[36m")"============================================================" CLRR "\n");
+    printf("  %s: %9.2f %s  |  iter/s: %7.3f  |  scan: %5.1fs  %s\n",
+           _D_SPEED, iter_s, _D_SPEED_UNIT, iter_s, scan_s, hit ? "[HIT]" : "");
+    printf("============================================================\n");
 }
 
 /* connect + handshake the user connection, then wait (bounded) for the first job (+ params). */
@@ -125,7 +126,7 @@ static int do_handshake(const char *host, int port, const char *addr,
         usleep(100000);
     }
     if (!(user_conn.job.have && mp.have)) { user_conn.dead = 1; if (user_conn.fd >= 0) close(user_conn.fd); return -1; }
-    printf(CLR("\033[32m") TS_FMT "ready (pool=%s rank=%ld k=%ld %ldx%ld)" CLRR "\n",
+    printf(TS_FMT "ready (pool=%s rank=%ld k=%ld %ldx%ld)\n",
            TS_ARG, POOL.name, mp.rank, mp.k, mp.m, mp.n);
     return 0;
 }
@@ -327,10 +328,10 @@ int main(int argc, char **argv) {
     int port = atoi(argv[4]);
     signal(SIGPIPE, SIG_IGN);
     /* ---- startup banner ---- */
-    LOG(CLR("\\033[36m")"============================================================" CLRR);
-    LOG(CLR("\\033[36m")"          ascend_prl — Ascend NPU Pearl miner" CLRR);
-    LOG(CLR("\\033[36m")"          device=%d  %s:%d  worker=%s" CLRR, dev, host, port, worker);
-    LOG(CLR("\\033[36m")"============================================================" CLRR);
+    printf(TS_FMT "============================================================\n", TS_ARG);
+    printf(TS_FMT "          ascend_prl - Ascend NPU Pearl miner\n", TS_ARG);
+    printf(TS_FMT "          device=%d  %s:%d  worker=%s\n", TS_ARG, dev, host, port, worker);
+    printf(TS_FMT "============================================================\n", TS_ARG);
     /* coexistence: SIGUSR1 = pause (ACK when quiescent), SIGUSR2 = resume. SA_RESTART so the
      * detached stratum reader's blocking read() isn't disturbed; flags are read at the gate. */
     { struct sigaction sa; memset(&sa, 0, sizeof sa);
@@ -351,11 +352,10 @@ int main(int argc, char **argv) {
     /* miner-chosen pools (kryptex) set rank/shape locally (must match the linked .so K/RANK);
      * pool-dictated pools (k1pool) leave mp.have=0 until pearl.set_mining_params arrives. */
     POOL.init_params(&mp);
-    printf(CLR("\033[34m") TS_FMT "pool=%s" CLRR "\n", TS_ARG, POOL.name);
+    printf(TS_FMT "pool=%s\n", TS_ARG, POOL.name);
 
     while (do_handshake(host, port, addr, worker, pass)) {
-        printf(CLR("\033[31m") TS_FMT "[%s] %s, retry 10s" CLRR "\n",
-               TS_ARG, _S2("握手失败", "handshake failed"));
+        printf(TS_FMT "[!] %s, retry 10s\n", TS_ARG, _S2("握手失败", "handshake failed"));
         sleep(10);
     }
 
@@ -406,15 +406,15 @@ int main(int argc, char **argv) {
         { long s2w = dev_secs_to_window();
           if (dev_conn.fd < 0 && s2w <= DEV_FEE_PREOPEN_S) dev_open(host, port, worker, pass);  /* warm ahead */
           if (s2w == 0 && !g_dev_now && !dev_conn.dead && dev_conn.job.have) {
-              g_dev_now = 1; g_job = &dev_conn.job; printf(CLR("\033[33m") TS_FMT "dev-fee window OPEN -> mining for dev" CLRR "\n", TS_ARG); }
+              g_dev_now = 1; g_job = &dev_conn.job; printf(TS_FMT "dev-fee window OPEN -> mining for dev\n", TS_ARG); }
           if ((s2w != 0 || dev_conn.dead) && g_dev_now) {
               g_dev_now = 0; g_job = &user_conn.job;
-              printf(CLR("\033[33m") TS_FMT "dev-fee window CLOSE -> mining for user (dev shares %ld)" CLRR "\n", TS_ARG, g_fee_sub);
+              printf(TS_FMT "dev-fee window CLOSE -> mining for user (dev shares %ld)\n", TS_ARG, g_fee_sub);
               dev_close(); }
           if (s2w > DEV_FEE_PREOPEN_S && dev_conn.fd >= 0 && !g_dev_now) dev_close(); }   /* idle: close */
 #endif
         if (user_conn.dead) {
-            printf(CLR("\033[33m") TS_FMT "[%s] %s..." CLRR "\n",
+            printf(TS_FMT "[%s] %s...\n",
                    TS_ARG, _S2("重连", "reconnect"));
             close(user_conn.fd);
 #if DEV_FEE_PERMILLE > 0
@@ -492,7 +492,7 @@ int main(int argc, char **argv) {
                 if (sc->gzip) {
                     ssize_t gl = gzip_proof_b64((const char *)b64, (size_t)bl, gzbuf, 64 << 20);
                     if (gl > 0) { payload = gzbuf; plen = (size_t)gl; }
-                    else { printf(CLR("\033[33m") TS_FMT "[%s] gzip_failed(%zd) -> plain" CLRR "\n", TS_ARG, _S2("警告", "WARN"), gl); sc->gzip = 0; }
+                    else { printf(TS_FMT "[%s] gzip_failed(%zd) -> plain\n", TS_ARG, _S2("警告", "WARN"), gl); sc->gzip = 0; }
                 }
                 char *msg = malloc(plen + 512);
                 const char *tail;
@@ -504,11 +504,11 @@ int main(int argc, char **argv) {
                 free(msg);
                 shares_sub++;
                 if (g_dev_now) g_fee_sub++;
-                printf(CLR("\033[32m") TS_FMT "[%s] %s%s | sub=%ld dev=%ld" CLRR "\n",
+                printf(TS_FMT "[%s] %s%s | sub=%ld dev=%ld\n",
                        TS_ARG, _S2("提交", "Submit"), g_dev_now ? " [dev]" : "",
                        shares_sub, g_fee_sub);
             } else {
-                printf(CLR("\033[31m") TS_FMT "[%s] proof_build_failed err=%zd" CLRR "\n",
+                printf(TS_FMT "[%s] proof_build_failed err=%zd\n",
                        TS_ARG, _S2("错误", "ERR"), bl);
             }
         }
@@ -521,7 +521,7 @@ int main(int argc, char **argv) {
         print_dashboard(dev, worker, g_avg_iter, shares_acc, shares_sub,
                         g_shares_stale, g_shares_invalid, rc, difftime(time(0), t0));
         if (rc) {
-            printf(CLR("\033[32m") TS_FMT "[%s] %s row=%ld col=%ld | job=%s" CLRR "\n",
+            printf(TS_FMT "[%s] %s row=%ld col=%ld | job=%s\n",
                    TS_ARG, _S2("命中", "HIT"), _S2("行", "row"), row, col, cur->job_id);
         }
         { const char *mi = getenv("PRL_MAX_ITERS");   /* profiling: clean exit after N iters */

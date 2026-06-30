@@ -107,14 +107,14 @@ void pool_handle_result(pool_conn_t *c, const char *line) {
         shares_rej++;
         extern long g_shares_stale, g_shares_invalid;
         if (is_stale) g_shares_stale++; else g_shares_invalid++;
-        LOG(CLR("\\033[31m")"[!]%s %s: %.80s" CLRR "\n", c->tag,
+        printf(TS_FMT "[!]%s %s: %.80s\n", TS_ARG, c->tag,
             is_stale ? "STALE" : "INVALID", line);
         return;
     }
     const char *r = jfind(line, "result");
     if (r && !strncmp(r, "true", 4)) {
         shares_acc++;
-        LOG(CLR("\\033[32m")"[✓]%s ACCEPTED (%ld/%ld)" CLRR "\n", c->tag, shares_acc, shares_sub);
+        printf(TS_FMT "[✓]%s ACCEPTED (%ld/%ld)\n", TS_ARG, c->tag, shares_acc, shares_sub);
     }
 }
 
