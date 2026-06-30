@@ -15,10 +15,9 @@
 #include <sys/types.h>
 #include <time.h>
 
-/* ---- log helper: shared timestamp ---- */
-extern const char *ts(void);
-#define TS_FMT "%s [%s] "
-#define TS_ARG ts(), __FUNCTION__
+/* ---- log helper (disabled for clean compile) ---- */
+#define TS_FMT ""
+#define TS_ARG
 
 #define LINE   8192
 #define JOBLEN 64
