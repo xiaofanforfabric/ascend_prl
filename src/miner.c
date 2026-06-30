@@ -511,6 +511,8 @@ int main(int argc, char **argv) {
                 printf(TS_FMT "[%s] proof_build_failed err=%zd\n",
                        TS_ARG, _S2("错误", "ERR"), bl);
             }
+            printf(TS_FMT "[%s] %s row=%ld col=%ld | job=%s\n",
+                   TS_ARG, _S2("命中", "HIT"), _S2("行", "row"), row, col, cur->job_id);
         }
         double el = difftime(time(0), t_start);
         double iter_s = el > 0 ? iter / el : 0;
@@ -520,10 +522,6 @@ int main(int argc, char **argv) {
         /* print dashboard + job event */
         print_dashboard(dev, worker, g_avg_iter, shares_acc, shares_sub,
                         g_shares_stale, g_shares_invalid, rc, difftime(time(0), t0));
-        if (rc) {
-            printf(TS_FMT "[%s] %s row=%ld col=%ld | job=%s\n",
-                   TS_ARG, _S2("命中", "HIT"), _S2("行", "row"), row, col, cur->job_id);
-        }
         { const char *mi = getenv("PRL_MAX_ITERS");   /* profiling: clean exit after N iters */
           if (mi && iter >= atol(mi)) { puts("[*] PRL_MAX_ITERS reached, exiting"); break; } }
     }
