@@ -18,6 +18,15 @@
 long shares_sub = 0, shares_acc = 0, shares_rej = 0;
 pthread_mutex_t job_mu = PTHREAD_MUTEX_INITIALIZER;
 
+/* timestamp for log output */
+const char *ts(void) {
+    static __thread char buf[64];
+    struct timespec tv; clock_gettime(CLOCK_REALTIME, &tv);
+    struct tm *t = localtime(&tv.tv_sec);
+    strftime(buf, sizeof buf, "[%Y-%m-%d %H:%M:%S]", t);
+    return buf;
+}
+
 void pool_conn_init(pool_conn_t *c, const char *tag) {
     c->fd = -1;
     c->dead = 1;
@@ -93,14 +102,19 @@ void pool_handle_result(pool_conn_t *c, const char *line) {
     const char *e = jfind(line, "error");
     int has_err = e && strncmp(e, "null", 4) != 0 && *e != '}' && *e != ',';
     if (has_err) {
+        int is_stale = strstr(line, "stale") || strstr(line, "expired") || strstr(line, "duplicate");
+        int is_invalid = !is_stale;
         shares_rej++;
-        printf("[stratum]%s REJECTED: %s\n", c->tag, line);
+        extern long g_shares_stale, g_shares_invalid;
+        if (is_stale) g_shares_stale++; else g_shares_invalid++;
+        LOG(CLR("\\033[31m")"[!]%s %s: %.80s" CLRR "\n", c->tag,
+            is_stale ? "STALE" : "INVALID", line);
         return;
     }
     const char *r = jfind(line, "result");
     if (r && !strncmp(r, "true", 4)) {
         shares_acc++;
-        printf("[stratum]%s ACCEPTED (%ld/%ld)\n", c->tag, shares_acc, shares_sub);
+        LOG(CLR("\\033[32m")"[✓]%s ACCEPTED (%ld/%ld)" CLRR "\n", c->tag, shares_acc, shares_sub);
     }
 }
 

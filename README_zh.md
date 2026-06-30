@@ -1,9 +1,17 @@
-# `ascend_prl` — 全球首个昇腾 NPU 加密货币矿工
+# `ascend_prl` — 全球首个昇腾 NPU 加密货币矿工（增强日志版）
 
 [English](README.md) | **中文**
 
+> **本仓库 Fork 自** [arabel1a/ascend_prl](https://github.com/arabel1a/ascend_prl)（原始作者：@arabel1a）
+
 一个从零编写、面向 [Pearl](https://arxiv.org/abs/2504.09971) **有用工作量证明（Proof-of-**Useful**-Work）** 币的矿工，
 运行在华为**昇腾 910B** NPU 上。已在 910B4 上实测，端到端可达 **~30 TH/s/卡**。
+
+**本 Fork 增强功能：**
+- ✨ **专业仪表盘日志** — 实时显示算力、接收/过期/无效份额，告别看不懂的纯文本
+- 🌐 **中英文双语输出** — 设置 `LANG=cn` 即可切换中文
+- 🎨 **彩色分级日志** — 命中🟢、任务🟣、错误🔴，一眼看懂矿机状态
+- 📊 **每 2 秒刷新仪表盘** — 矿机运行状态一目了然
 
 > **免责声明：** 仅供学习研究之用。请仅在你拥有授权的硬件上运行。
 
@@ -14,42 +22,113 @@
    `prl1p2skcz8kxn03p3j2hzaz4j687ewan8deju7lgvpswux9hkgavcz5s6v5p83`。
 2. **选择矿池。** 任何标准 `stratum` 协议的 Pearl 矿池都应可用。本项目在
    [Kryptex](https://pool.kryptex.com/prl) 上测试。注意：不同矿池接受的 M、N、K 形状不同（见[性能与形状](#性能与形状)）。
-3. **运行** —— 以下三选一：
+3. **运行** —— 以下二选一：
 
-   **方式一 —— Docker**（推荐）：
+   **方式一 —— 预编译二进制**（推荐，需要 Linux/aarch64 + CANN 运行时）：
    ```bash
-   docker pull arabel1a/ascend_prl
-   docker run --rm -it --privileged --network host \
-     -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
-     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
-     -v /etc/ascend_install.info:/etc/ascend_install.info \
-     -v /usr/local/dcmi:/usr/local/dcmi \
-     -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-     -e WALLET=prl1...你的钱包地址 -e POOL=矿池地址 -e PORT=7000 \
-     -e ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
-     arabel1a/ascend_prl:latest
-   ```
-   镜像内只包含 CANN **运行时**；NPU 驱动（`libascend_hal.so`）由宿主机提供，
-   因此 `-v /usr/local/Ascend/driver/...` 这几个挂载和 `--privileged` 是矿工访问
-   NPU 的**必需项**。用 `ASCEND_RT_VISIBLE_DEVICES` 指定要挖矿的芯片（die）。
-
-   > **国内用户注意：** Docker Hub 在中国大陆基本不可用，请通过
-   > [Docker Hub 镜像](https://github.com/dongyubin/DockerHub)（需支持代理「用户仓库」，
-   > 并非所有镜像都支持）拉取，例如：
-   > ```bash
-   > docker pull docker.1panel.live/arabel1a/ascend_prl   # 本仓库实测最快的镜像（仅限国内）
-   > ```
-
-   **方式二 —— 预编译二进制**（需要 Linux/aarch64 + CANN 运行时）：
-   ```bash
-   git clone https://github.com/arabel1a/ascend_prl.git && cd ascend_prl
-   ./scripts/get_release.sh                 # 或从 Releases 页面手动下载
+   git clone https://github.com/xiaofanforfabric/ascend_prl.git && cd ascend_prl
+   ./scripts/get_release.sh
    export WALLET=prl1...你的钱包地址
-   export POOL=矿池地址   PORT=7000          # 你的矿池 stratum 主机/端口
-   ASCEND_RT_VISIBLE_DEVICES=0,1,2,3 ./scripts/launch.sh
+   export POOL=矿池地址  PORT=7048
+   LANG=cn ASCEND_RT_VISIBLE_DEVICES=0 ./scripts/launch.sh
    ```
 
-   **方式三 —— 自行编译。** 见[编译](#编译)。
+   **方式二 —— 自行编译。** 见[编译](#编译)。
+
+## 矿机到底在干什么？—— 运行原理解析
+
+很多新手第一次启动矿机，看到满屏日志一脸懵。其实矿机内部就是一个永不停歇的流水线：
+
+### 挖矿流水线（每轮迭代 ~1-2 秒）
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  ① 准备   │ →  │  ② 计算   │ →  │  ③ 验证   │ →  │  ④ 提交   │
+│  CPU 生成 │    │  NPU 做  │    │  NPU 做  │    │  (命中时)  │
+│  随机矩阵  │    │  矩阵乘法  │    │ 哈希比对  │    │  发证明   │
+│  A 和 B   │    │  A×Bᵀ   │    │  ≤目标？  │    │  到矿池   │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘
+      ↑                 ↑               ↑              ↑
+  16K×4K int8     Cube 单元       BLAKE3 哈希    base64 证明
+  64 线程并行    20 核 AI Core    Vector 单元    约 136KB
+```
+
+- **① CPU 准备**（prep）：生成 16384×4096 的随机矩阵 A 和 B（int8），计算梅克尔树根、噪声矩阵
+- **② NPU 矩阵乘法**（scan）：Cube 单元做 `A_noised × Bt_noised`，每轮处理 128 条 strip
+- **③ NPU 哈希比对**：Vector 单元对结果做 BLAKE3 哈希，判断是否 ≤ 目标难度值
+- **④ 命中提交**：如果找到有效哈希，构造 ZK 证明 → base64 编码 → 提交矿池
+
+### 关键优化：深度 2 流水线
+
+```
+时间 →
+┌──── 迭代 1 ────┐┌──── 迭代 2 ────┐
+CPU 准备 [████░░]  CPU 准备 [████░░]
+NPU 计算   [████]    NPU 计算   [████]
+                ^ CPU 准备迭代 2 和 NPU 计算迭代 1 同时进行！
+```
+
+这样 CPU 和 NPU 同时工作，不浪费任何等待时间。
+
+### 日志输出说明
+
+**仪表盘（每 2 秒刷新）：**
+```
+============================================================
+  DEVICE: NPU-0  |  Name: npu-0             |  Accept: 42   Stale: 1    Invalid: 0
+  Speed:   0.78 TA/s  |  iter/s:   0.781  |  scan:  1.3s
+============================================================
+```
+
+| 仪表盘字段 | 含义 |
+|---|---|
+| `DEVICE` | NPU 设备号 |
+| `Accept` | 矿池接受的份额数 |
+| `Stale` | 过期份额（网络延迟导致） |
+| `Invalid` | 无效份额（数据错误） |
+| `Speed / TA/s` | 等效算力（自创单位 `TA/s` ≈ `TH/s`） |
+| `iter/s` | 每秒迭代数 |
+| `scan` | 单次 NPU 扫描耗时 |
+
+**事件日志（颜色区分）：**
+```
+[2026-06-30 10:30:01] [k_dispatch]  [New job] abc123 height=12345       ← 紫色：矿池新任务
+[2026-06-30 10:30:02] [main]        [HIT] row=128 col=64 | job=abc123   ← 绿色：找到命中
+[2026-06-30 10:30:02] [stratum]     [✓] ACCEPTED (43/44)               ← 绿色：份额被接受
+[2026-06-30 10:30:03] [stratum]     [INVALID] stale share               ← 红色：份额被拒
+```
+
+**语言切换：**
+```bash
+# 中文模式
+LANG=cn ASCEND_RT_VISIBLE_DEVICES=0 ./scripts/launch.sh
+
+# 英文模式（默认）
+ASCEND_RT_VISIBLE_DEVICES=0 ./scripts/launch.sh
+
+# 关掉颜色（保存日志到文件时推荐）
+PRL_NOCOLOR=1 ASCEND_RT_VISIBLE_DEVICES=0 ./scripts/launch.sh
+```
+
+中文模式效果：
+```
+============================================================
+  设备: NPU-0  |  标识: npu-0             |  接收: 42  过期: 1   无效: 0
+  速度:   0.78 TA/s  |  iter/s:   0.781  |  scan:  1.3s
+============================================================
+[2026-06-30 10:30:01] [k_dispatch]  [新任务] abc123 height=12345
+[2026-06-30 10:30:02] [main]        [命中] row=128 col=64 | job=abc123
+[2026-06-30 10:30:02] [stratum]     [✓] 通过 (43/44)
+```
+
+### 算力单位说明
+
+| 本矿工 | 传统矿工 | 含义 |
+|---|---|---|
+| `1 TA/s` | `1 TH/s` | 每秒 10¹² 次哈希 |
+| `1 MA/s` | `1 MH/s` | 每秒 10⁶ 次哈希 |
+
+这是自定义单位，方便区分传统 PoW 和 Pearl 的 PoUW。`TA/s` 中的 `T` 代表 "Tensor"。
 
 ## 与其他 NPU 任务共存
 

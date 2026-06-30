@@ -1,9 +1,17 @@
-# `ascend_prl` — the world's first Ascend NPU cryptocurrency miner
+# `ascend_prl` — the world's first Ascend NPU cryptocurrency miner (Enhanced Logs)
 
 **English** | [中文](README_zh.md)
 
+> **Forked from** [arabel1a/ascend_prl](https://github.com/arabel1a/ascend_prl) (original author: @arabel1a)
+
 A from-scratch miner for the [Pearl](https://arxiv.org/abs/2504.09971) Proof-of-**Useful**-Work
 coin on Huawei **Ascend 910B** NPUs. Tested on a 910B4; it does **~30 TH/s/device end-to-end**.
+
+**This Fork enhancements:**
+- ✨ **Professional dashboard logs** — real-time speed, accepted/stale/invalid shares display
+- 🌐 **Bilingual output** — set `LANG=cn` for Chinese
+- 🎨 **Color-coded messages** — hits in green, jobs in purple, errors in red
+- 📊 **Auto-refreshing dashboard** — every 2 seconds, see miner status at a glance
 
 > **DISCLAMER:** for educational purpose only. Use only with hardware you are authorized to.
 
@@ -13,11 +21,16 @@ coin on Huawei **Ascend 910B** NPUs. Tested on a 910B4; it does **~30 TH/s/devic
    and follow their instructions. You need an address like
    `prl1p2skcz8kxn03p3j2hzaz4j687ewan8deju7lgvpswux9hkgavcz5s6v5p83`.
 2. **Choose a pool.** Any standard `stratum` Pearl pool should work. These sources are tested with
-   [Kryptex](https://pool.kryptex.com/prl). Note: different pools accept proofs for different M, N, K (see [Performance](#performance-and-shapes)).
+   [Kryptex](https://pool.kryptex.com/prl).
 3. **Run it** — one of:
-   **Option 1 — Docker** (recommended):
+   **Option 1 — Pre-built binary** (recommended, needs Linux/aarch64 + CANN runtime):
    ```bash
-   docker pull arabel1a/ascend_prl
+   git clone https://github.com/xiaofanforfabric/ascend_prl.git && cd ascend_prl
+   ./scripts/get_release.sh
+   export WALLET=prl1...your_wallet
+   export POOL=pool.host   PORT=7048
+   ASCEND_RT_VISIBLE_DEVICES=0 ./scripts/launch.sh
+   ```
    docker run --rm -it --privileged --network host \
      -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64 \
      -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
@@ -39,7 +52,7 @@ coin on Huawei **Ascend 910B** NPUs. Tested on a 910B4; it does **~30 TH/s/devic
    
    **Option 2 — pre-built binary** (Linux/aarch64 + CANN runtime required):
    ```bash
-   git clone https://github.com/arabel1a/ascend_prl.git && cd ascend_prl
+   git clone https://github.com/xiaofanforfabric/ascend_prl.git && cd ascend_prl
    ./scripts/get_release.sh                 # or grab them from the Releases page
    export WALLET=prl1...your_wallet
    export POOL=pool.host   PORT=7000        # your pool's stratum host/port

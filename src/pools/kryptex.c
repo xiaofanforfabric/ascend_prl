@@ -31,8 +31,8 @@ static void k_init_params(mining_params_t *mp) {
     mp->rows[0] = 0; mp->rows[1] = 32; mp->nrows = 2;
     for (size_t i = 0; i < 64; i++) mp->cols[i] = i;
     mp->ncols = 64; mp->have = 1;
-    printf("[stratum] kryptex: rank=%ld k=%ld %ldx%ld (miner-chosen)\n",
-           mp->rank, mp->k, mp->m, mp->n);
+    LOG(CLR("\\033[36m")"kryptex: rank=%ld k=%ld %ldx%ld (miner-chosen)" CLRR "\n",
+        mp->rank, mp->k, mp->m, mp->n);
 }
 
 static int k_open(pool_conn_t *c, const char *host, int port,
@@ -85,7 +85,8 @@ static void k_handle_notify(pool_conn_t *c, const char *line) {
     if (have_t) { memcpy(c->job.ptarget, ptarget, 32); c->job.have_target = 1; }
     c->job.have = 1;
     pthread_mutex_unlock(&job_mu);
-    printf("[stratum]%s job %s height=%ld%s\n", c->tag, jid, height, have_t ? " (target set)" : "");
+    LOG(CLR("\\033[35m")"[%s] %s height=%ld%s" CLRR, c->tag, jid, height,
+        have_t ? " (target)" : "");
 }
 
 static void k_dispatch(pool_conn_t *c, const char *line, mining_params_t *mp) {
@@ -97,7 +98,7 @@ static void k_dispatch(pool_conn_t *c, const char *line, mining_params_t *mp) {
     else if (!strcmp(meth, "mining.set_difficulty")) {
         const char *p = jfind(line, "params");
         if (p && *p == '[') c->job.difficulty = atof(p + 1);
-        printf("[stratum]%s difficulty %.0f\n", c->tag, c->job.difficulty);
+        LOG("[%s] %s %.0f", c->tag, CLR("\\033[33m")"difficulty" CLRR, c->job.difficulty);
     } else if (strstr(line, "\"result\"")) {
         /* the authorize ack carries "type":"v2" iff the pool accepted gzip for this session */
         char ty[8] = "";
