@@ -81,7 +81,7 @@ static mining_params_t mp;      /* miner-chosen (kryptex) or pool-dictated (k1po
 static long g_fee_sub = 0;      /* count of shares submitted during dev-fee windows */
 
 /* ---- dashboard state ---- */
-static long g_shares_stale = 0, g_shares_invalid = 0;
+long g_shares_stale = 0, g_shares_invalid = 0;
 static double g_best_iter = 0, g_avg_iter = 0;
 static long g_iter_count = 0;
 static time_t g_last_dash = 0;
@@ -414,7 +414,7 @@ int main(int argc, char **argv) {
           if (s2w > DEV_FEE_PREOPEN_S && dev_conn.fd >= 0 && !g_dev_now) dev_close(); }   /* idle: close */
 #endif
         if (user_conn.dead) {
-            printf("[%s] %s...\n",
+            printf("%s...\n",
                    _S2("重连", "reconnect"));
             close(user_conn.fd);
 #if DEV_FEE_PERMILLE > 0
@@ -504,15 +504,15 @@ int main(int argc, char **argv) {
                 free(msg);
                 shares_sub++;
                 if (g_dev_now) g_fee_sub++;
-                printf("[%s] %s%s | sub=%ld dev=%ld\n",
+                printf("%s%s | sub=%ld dev=%ld\n",
                        _S2("提交", "Submit"), g_dev_now ? " [dev]" : "",
                        shares_sub, g_fee_sub);
             } else {
-                printf("[%s] proof_build_failed err=%zd\n",
+                printf("%s err=%zd\n",
                        _S2("错误", "ERR"), bl);
             }
-            printf("[%s] %s row=%ld col=%ld | job=%s\n",
-                   _S2("命中", "HIT"), _S2("行", "row"), row, col, cur->job_id);
+            printf("%s row=%ld col=%ld | job=%s\n",
+                   _S2("命中", "HIT"), row, col, cur->job_id);
         }
         double el = difftime(time(0), t_start);
         double iter_s = el > 0 ? iter / el : 0;
