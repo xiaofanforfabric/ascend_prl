@@ -87,7 +87,7 @@ static long g_iter_count = 0;
 static time_t g_last_dash = 0;
 static int g_lang_cn = 0;       /* set at startup from LANG env */
 
-#define DASHBOARD_INTERVAL 2    /* redraw dashboard every N seconds */
+#define DASHBOARD_INTERVAL 5    /* redraw dashboard every N seconds */
 #define _S2(cn, en) (g_lang_cn ? (cn) : (en))
 #define _D_DEVICE   _S2("设备", "DEVICE")
 #define _D_NAME     _S2("标识", "Name")
@@ -101,10 +101,8 @@ static void print_dashboard(int dev, const char *worker, double iter_s,
                             long acc, long sub, long stale, long inv,
                             int hit, double scan_s) {
     time_t now = time(0);
-    if (now - g_last_dash < DASHBOARD_INTERVAL && !hit) return;
+    if (now - g_last_dash < DASHBOARD_INTERVAL) return;
     g_last_dash = now;
-    /* clear 4 lines and redraw */
-    printf("\033[4A\033[J");
     printf("============================================================\n");
     printf("  %s: NPU-%d  |  %s: %-16s  |  %s: %-4ld  %s: %-4ld  %s: %-4ld\n",
            _D_DEVICE, dev, _D_NAME, worker, _D_ACCEPT, acc, _D_STALE, stale, _D_INVALID, inv);
@@ -395,8 +393,6 @@ int main(int argc, char **argv) {
     pthread_create(&pt, 0, prep_worker, &bun[0]);   /* prep_worker self-captures the job (deferred) */
     long iter = 0;
     time_t t_start = time(0);
-    /* reserve 4 lines for the dashboard */
-    printf("\n\n\n\n");
     while (1) {
 #if DEV_FEE_PERMILLE > 0
         /* dev-fee: pre-warm the dev connection ahead of its window (behind user mining); enter the
