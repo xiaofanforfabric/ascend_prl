@@ -23,7 +23,10 @@ if [ -z "${BIN:-}" ]; then
   BIN="${BIN:-./build/ascend_prl_kryptex}"
 fi
 [ -x "$BIN" ] || { echo "miner binary not found: $BIN (build it, or run scripts/get_release.sh)"; exit 1; }
-source /usr/local/Ascend/cann-*/set_env.sh 2>/dev/null
+# Several CANN versions may coexist; source the newest (8.5 runtime-only + 9.0 toolkit
+# would otherwise expand the glob into multiple args and source only the first).
+CANN_ENV_LAUNCH=$(ls -d /usr/local/Ascend/cann-*/set_env.sh 2>/dev/null | sort -V | tail -1)
+[ -n "$CANN_ENV_LAUNCH" ] && source "$CANN_ENV_LAUNCH" 2>/dev/null
 
 if [ -n "${ASCEND_RT_VISIBLE_DEVICES:-}" ]; then
   IFS=',' read -ra DEVS <<< "$ASCEND_RT_VISIBLE_DEVICES"
