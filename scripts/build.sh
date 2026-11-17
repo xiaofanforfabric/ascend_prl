@@ -49,8 +49,10 @@ done
 
 echo "CANN:   $CANN_DIR"
 echo "ASC:    $ASC_MODULES"
-# container clock skews ~200s vs the host; touch so make/cmake don't see future mtimes
-find . -type f -exec touch {} +
+# Container clock skew makes make/cmake see future mtimes. Touch build inputs only,
+# and never abort when a file is owned by another user (e.g. a stray *.run in the tree).
+find src kernel scripts proof-ffi Makefile -type f \
+     -not -path 'proof-ffi/target/*' -exec touch {} + 2>/dev/null || true
 
 make kernel
 make proof
