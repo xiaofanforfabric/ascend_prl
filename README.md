@@ -1,5 +1,7 @@
 # `ascend_prl` — the world's first Ascend NPU cryptocurrency miner (Enhanced Logs)
 
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
+
 **English** | [中文](README_zh.md)
 
 > **Forked from** [arabel1a/ascend_prl](https://github.com/arabel1a/ascend_prl) (original author: @arabel1a)
