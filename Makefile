@@ -7,7 +7,11 @@ PIPE_DEPTH ?= 4
 
 OUT  := build
 # Locate BLAKE3 C sources from the Cargo registry when building the standalone miner.
-BLK  ?= $(shell ls -d /root/.cargo/registry/src/*/blake3-1*/c 2>/dev/null | head -1)
+# Pass BLK=/path/to/blake3-1.x/c when the registry lives elsewhere.
+BLK  ?= $(shell ls -d $(HOME)/.cargo/registry/src/*/blake3-1*/c 2>/dev/null | sort -V | tail -1)
+ifeq ($(strip $(BLK)),)
+$(error BLAKE3 C sources not found: run 'cd proof-ffi && cargo fetch', or pass BLK=/path/to/blake3-*/c)
+endif
 BLK_SRC := $(BLK)/blake3.c $(BLK)/blake3_dispatch.c $(BLK)/blake3_portable.c $(BLK)/blake3_neon.c
 CC   := gcc
 # BLAKE3_USE_TBB uses the pthread split hook in blake3_join.c (not oneTBB).
