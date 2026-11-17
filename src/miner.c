@@ -336,7 +336,9 @@ static void process_proof(bundle_t *cur, uint8_t *bin, uint8_t *payload_buf) {
         if (!msg) {
             fputs("[!] cannot allocate share message\n", stderr);
         } else {
-            prefix_conn.msg_id = atomic_fetch_add(&sc->msg_id, 1);
+            // Share ids start above the handshake ids (subscribe=1, authorize=3) so
+            // the pool's acks are not counted as accepted shares (stratum.c).
+            prefix_conn.msg_id = 1000 + atomic_fetch_add(&sc->msg_id, 1);
             const char *tail;
             int hl = POOL.submit_prefix(&prefix_conn, sub_addr, submit_worker, cur->job_id, msg, 512, &tail);
             if (hl < 0 || hl >= 512) {

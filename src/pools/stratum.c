@@ -126,12 +126,22 @@ void pool_stop_reader(pool_conn_t *c) {
     c->fd = -1;
 }
 
+/* mining.submit responses use ids >= SHARE_ID_BASE (see miner.c); the handshake
+ * acks (subscribe id=1, authorize id=3) also return "result":true and must not be
+ * counted as accepted shares. */
+#define SHARE_ID_BASE 1000
+
 void pool_handle_result(pool_conn_t *c, const char *line) {
+    const char *ip = jfind(line, "id");
+    int is_share = ip && atol(ip) >= SHARE_ID_BASE;
     const char *e = jfind(line, "error");
     int has_err = e && strncmp(e, "null", 4) != 0 && *e != '}' && *e != ',';
     if (has_err) {
+        if (!is_share) {          /* handshake / non-share rejection */
+            printf("[!]%s handshake error: %.120s\n", c->tag, line);
+            return;
+        }
         int is_stale = strstr(line, "stale") || strstr(line, "expired") || strstr(line, "duplicate");
-        int is_invalid = !is_stale;
         shares_rej++;
         if (is_stale) g_shares_stale++; else g_shares_invalid++;
         printf("[!]%s %s: %.80s\n", c->tag,
@@ -139,7 +149,7 @@ void pool_handle_result(pool_conn_t *c, const char *line) {
         return;
     }
     const char *r = jfind(line, "result");
-    if (r && !strncmp(r, "true", 4)) {
+    if (r && !strncmp(r, "true", 4) && is_share) {
         shares_acc++;
         printf("[✓]%s ACCEPTED (%ld/%ld)\n", c->tag, shares_acc, shares_sub);
     }
