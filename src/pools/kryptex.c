@@ -9,6 +9,11 @@
 #define MDIM 131072
 #endif
 
+/* Client identifier shown on the pool dashboard; override with -DPOOL_AGENT=... */
+#ifndef POOL_AGENT
+#define POOL_AGENT "ascend_prl/0.2"
+#endif
+
 static void k_init_params(mining_params_t *mp) {
     mp->m = MDIM; mp->n = MDIM; mp->k = PRL_K;
     mp->rows[0] = 0; mp->rows[1] = 32; mp->nrows = 2;
@@ -23,7 +28,7 @@ static int k_open(pool_conn_t *c, const char *host, int port,
     c->gzip = 0;
     if (pool_connect(c, host, port)) return -1;
     char line[LINE];
-    snprintf(line, LINE, "{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"cminer/0.1\"]}");
+    snprintf(line, LINE, "{\"id\":1,\"method\":\"mining.subscribe\",\"params\":[\"%s\"]}", POOL_AGENT);
     pool_send_line(c, line);
     const char *pw = (pass && *pass) ? pass : "";
     if (getenv("PRL_NOGZIP")) {
@@ -31,8 +36,8 @@ static int k_open(pool_conn_t *c, const char *host, int port,
                  addr, worker, pw[0] ? pw : "x");
     } else {
         snprintf(line, LINE, "{\"id\":3,\"method\":\"mining.authorize\",\"params\":"
-                 "{\"wallet\":\"%s.%s\",\"agent\":\"cminer/0.1\",\"password\":\"%s\",\"type\":\"v2\"}}",
-                 addr, worker, pw);
+                 "{\"wallet\":\"%s.%s\",\"agent\":\"%s\",\"password\":\"%s\",\"type\":\"v2\"}}",
+                 addr, worker, POOL_AGENT, pw);
     }
     pool_send_line(c, line);
     if (getenv("PRL_GZIP") && !getenv("PRL_NOGZIP")) c->gzip = 1;

@@ -145,19 +145,68 @@ PRL_COEXIST_GUARD=1 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./scripts/launch.s
 # Docker：在 run 命令中加上  -e PRL_COEXIST_GUARD=1 （scripts/run_container.sh 会自动透传）
 ```
 
-## 编译
+## 编译（Ubuntu 22.04 aarch64 实测）
 
-依赖：
-- CANN 9.0.0 工具链 + Ascend-C 编译器
-- 支持 `-march=armv8-a+crypto` 的 `gcc`（用于 NEON 版 BLAKE3）
-- `cmake ≥ 3.16`
-- BLAKE3 的 C 源码（`blake3-1.x/c` 目录 —— 已随仓库附带，或取自 cargo registry）
-- cargo，以及用于 proof FFI 的 Pearl Rust 工作区（`pearl-blake3`、`zk-pow`）——
-  请在 `proof-ffi/Cargo.toml` 中把路径改成你本地的检出目录。
+编译需要 **CANN toolkit**（不是 runtime）；运行时才需要 NPU 驱动。
+
+### 1. 系统依赖
 
 ```bash
-make                     # 固定 rank=128、K=4096；生成全部正式版构建产物
+sudo apt-get update
+sudo apt-get install -y gcc g++ make cmake git curl clang pkg-config wget python3-pip
 ```
+
+> `python3-pip` 是必需的：CANN 安装器要装 `llm_datadist` 的 wheel，缺 pip3 会导致整个安装回滚。
+
+### 2. CANN 9.0.0 toolkit
+
+```bash
+wget https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/legacy/20260422000325096/Ascend-cann-toolkit_9.0.0_linux-aarch64.run
+chmod +x Ascend-cann-toolkit_9.0.0_linux-aarch64.run
+sudo ./Ascend-cann-toolkit_9.0.0_linux-aarch64.run --install --quiet
+
+source /usr/local/Ascend/cann-9.0.0/set_env.sh
+command -v asc          # 必须能输出路径
+```
+
+机器上同时存在多个 CANN 版本时，`scripts/build.sh` 会自动挑**带 `asc_modules` 的最新版**。
+
+### 3. Rust 工具链
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+```
+
+### 4. Pearl Rust 工作区（提供 `pearl-blake3` / `zk-pow`）
+
+```bash
+git clone --depth 1 --recurse-submodules --shallow-submodules \
+  https://github.com/pearl-research-labs/pearl.git "$HOME/pearl"
+sed -i "s|/root/pearl-rust/pearl-blake3|$HOME/pearl/pearl-blake3|; \
+        s|/root/pearl-rust/zk-pow|$HOME/pearl/zk-pow|" proof-ffi/Cargo.toml
+```
+
+> `zk-pow` 依赖 vendored 的 `plonky2`，必须整仓 clone。这两个 crate 必须是支持 **cert v3（salted roots）** 的版本，否则份额会全部被判无效。
+
+### 5. 编译
+
+```bash
+bash scripts/build.sh     # 自动探测 CANN，并校验 gcc / cmake / cargo
+# 或者分步：make kernel / make proof / make miner
+```
+
+BLAKE3 的 C 源码默认取 `$HOME/.cargo/registry/src/*/blake3-1*/c`；找不到时用
+`make BLK=/path/to/blake3-1.x/c` 指定。
+
+产物都在 `build/`：
+
+| 文件 | 说明 |
+| --- | --- |
+| `ascend_prl_kryptex` | Kryptex 前端 |
+| `ascend_prl_k1` | k1pool 前端 |
+| `libpearl_hlc2.so` | Ascend C 算子 |
+| `libpearl_proof.so` | Rust proof FFI |
 
 编译选项（`make 变量=...`）：
 

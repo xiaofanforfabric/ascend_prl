@@ -76,19 +76,71 @@ PRL_COEXIST_GUARD=1 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./scripts/launch.s
 # Docker: add  -e PRL_COEXIST_GUARD=1  to your run (scripts/run_container.sh passes it through)
 ```
 
-## Build
+## Build (verified on Ubuntu 22.04 aarch64)
 
-Requirements: 
-- CANN 9.0.0 toolchain + Ascend-C compiler 
-- `gcc` with `-march=armv8-a+crypto` (NEON BLAKE3)
-- `cmake ≥ 3.16`.
-- BLAKE3 C sources (the `blake3-1.x/c` dir — vendored, or from the cargo registry).
-- cargo, The Pearl Rust workspace (`pearl-blake3`, `zk-pow`) for the proof FFI — adjust the paths in
-  `proof-ffi/Cargo.toml` to your checkout.
+Compiling needs the **CANN toolkit** (not the runtime); only running needs the NPU driver.
+
+### 1. System packages
 
 ```bash
-make                     # fixed rank=128, K=4096; builds all host/kernel/proof artifacts
+sudo apt-get update
+sudo apt-get install -y gcc g++ make cmake git curl clang pkg-config wget python3-pip
 ```
+
+> `python3-pip` is required: the CANN installer adds an `llm_datadist` wheel and rolls the
+> whole installation back when pip3 is missing.
+
+### 2. CANN 9.0.0 toolkit
+
+```bash
+wget https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/legacy/20260422000325096/Ascend-cann-toolkit_9.0.0_linux-aarch64.run
+chmod +x Ascend-cann-toolkit_9.0.0_linux-aarch64.run
+sudo ./Ascend-cann-toolkit_9.0.0_linux-aarch64.run --install --quiet
+
+source /usr/local/Ascend/cann-9.0.0/set_env.sh
+command -v asc          # must print a path
+```
+
+When several CANN versions coexist, `scripts/build.sh` picks the newest one that ships
+`asc_modules`.
+
+### 3. Rust toolchain
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+```
+
+### 4. Pearl Rust workspace (`pearl-blake3` / `zk-pow`)
+
+```bash
+git clone --depth 1 --recurse-submodules --shallow-submodules \
+  https://github.com/pearl-research-labs/pearl.git "$HOME/pearl"
+sed -i "s|/root/pearl-rust/pearl-blake3|$HOME/pearl/pearl-blake3|; \
+        s|/root/pearl-rust/zk-pow|$HOME/pearl/zk-pow|" proof-ffi/Cargo.toml
+```
+
+> `zk-pow` depends on a vendored `plonky2`, so clone the whole repo. Both crates must be a
+> **cert v3 (salted roots)** capable revision, otherwise every share is rejected.
+
+### 5. Build
+
+```bash
+bash scripts/build.sh     # auto-detects CANN, checks gcc / cmake / cargo
+# or step by step: make kernel / make proof / make miner
+```
+
+BLAKE3 C sources are taken from `$HOME/.cargo/registry/src/*/blake3-1*/c`; override with
+`make BLK=/path/to/blake3-1.x/c` when the registry lives elsewhere.
+
+Artifacts land in `build/`:
+
+| File | Purpose |
+| --- | --- |
+| `ascend_prl_kryptex` | Kryptex frontend |
+| `ascend_prl_k1` | k1pool frontend |
+| `libpearl_hlc2.so` | Ascend C kernel |
+| `libpearl_proof.so` | Rust proof FFI |
 
 Build flags (`make VAR=...`):
 
